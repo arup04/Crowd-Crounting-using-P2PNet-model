@@ -1,0 +1,9 @@
+# Web Application Dependencies
+flask>=2.0.0
+
+# These are already in p2pnet_pipeline/requirements.txt:
+# torch>=1.5.0
+# torchvision>=0.6.0
+# numpy>=1.19.0
+# opencv-python>=4.5.0
+# Pillow>=8.0.0

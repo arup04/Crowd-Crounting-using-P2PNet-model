@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crowd Analysis - Person Counting</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Crowd Analysis</h1>
+            <p class="subtitle">Upload an image or video to count people</p>
+        </header>
+
+        <div class="mode-selector">
+            <button class="mode-btn active" id="imageModeBtn" onclick="setMode('image')">Image</button>
+            <button class="mode-btn" id="videoModeBtn" onclick="setMode('video')">Video</button>
+        </div>
+
+        <main>
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">&#9192;</div>
+                    <p class="upload-text" id="uploadText">Drag & drop an image here</p>
+                    <p class="upload-hint">or</p>
+                    <label for="fileInput" class="upload-button">Choose File</label>
+                    <input type="file" id="fileInput" accept="image/*" hidden>
+                    <p class="supported-formats" id="supportedFormats">Supported: JPG, PNG</p>
+                </div>
+
+                <div class="preview-section" id="previewSection" style="display: none;">
+                    <h3 id="previewTitle">Original Image</h3>
+                    <div id="previewContent">
+                    </div>
+                    <button class="clear-button" id="clearButton">Clear</button>
+                </div>
+            </div>
+
+            <button class="analyze-button" id="analyzeButton" disabled>Analyze</button>
+
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Analyzing crowd...</p>
+            </div>
+
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <div class="count-display">
+                    <span class="count-label" id="countLabel">People Detected</span>
+                    <span class="count-value" id="countValue">0</span>
+                    <div class="video-stats" id="videoStats" style="display: none;">
+                        <span>Max: <strong id="maxCount">0</strong></span>
+                        <span>Min: <strong id="minCount">0</strong></span>
+                        <span>Frames: <strong id="frameCount">0</strong></span>
+                    </div>
+                </div>
+                <div class="result-image-container">
+                    <h3 id="resultTitle">Result</h3>
+                    <img id="resultImage" alt="Analysis result">
+                    <video id="resultVideo" controls style="display: none;"></video>
+                </div>
+            </div>
+
+            <div class="error-message" id="errorMessage" style="display: none;"></div>
+        </main>
+
+        <footer>
+            <p>Powered by P2PNet (Point-to-Point Network)</p>
+        </footer>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const previewSection = document.getElementById('previewSection');
+        const clearButton = document.getElementById('clearButton');
+        const analyzeButton = document.getElementById('analyzeButton');
+        const loading = document.getElementById('loading');
+        const resultsSection = document.getElementById('resultsSection');
+        const countValue = document.getElementById('countValue');
+        const resultImage = document.getElementById('resultImage');
+        const resultVideo = document.getElementById('resultVideo');
+        const errorMessage = document.getElementById('errorMessage');
+        const uploadText = document.getElementById('uploadText');
+        const supportedFormats = document.getElementById('supportedFormats');
+        const previewTitle = document.getElementById('previewTitle');
+        const previewContent = document.getElementById('previewContent');
+        const countLabel = document.getElementById('countLabel');
+        const videoStats = document.getElementById('videoStats');
+        const maxCountEl = document.getElementById('maxCount');
+        const minCountEl = document.getElementById('minCount');
+        const frameCountEl = document.getElementById('frameCount');
+        const resultTitle = document.getElementById('resultTitle');
+
+        let selectedFile = null;
+        let currentMode = 'image'; // 'image' or 'video'
+
+        // Mode switching
+        function setMode(mode) {
+            currentMode = mode;
+            const imageBtn = document.getElementById('imageModeBtn');
+            const videoBtn = document.getElementById('videoModeBtn');
+
+            if (mode === 'image') {
+                imageBtn.classList.add('active');
+                videoBtn.classList.remove('active');
+                fileInput.accept = 'image/*';
+                uploadText.textContent = 'Drag & drop an image here';
+                supportedFormats.textContent = 'Supported: JPG, PNG';
+                countLabel.textContent = 'People Detected';
+                videoStats.style.display = 'none';
+                resultImage.style.display = 'block';
+                resultVideo.style.display = 'none';
+            } else {
+                videoBtn.classList.add('active');
+                imageBtn.classList.remove('active');
+                fileInput.accept = 'video/*';
+                uploadText.textContent = 'Drag & drop a video here';
+                supportedFormats.textContent = 'Supported: MP4, AVI, MOV, WEBM';
+                countLabel.textContent = 'Average People Count';
+                videoStats.style.display = 'block';
+                resultImage.style.display = 'none';
+                resultVideo.style.display = 'block';
+            }
+
+            // Reset UI
+            clearFile();
+        }
+
+        // Drag and drop handlers
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        // File input handler
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        // Handle selected file
+        function handleFile(file) {
+            if (currentMode === 'image') {
+                if (!file.type.startsWith('image/')) {
+                    showError('Please select a valid image file');
+                    return;
+                }
+            } else {
+                if (!file.type.startsWith('video/')) {
+                    showError('Please select a valid video file');
+                    return;
+                }
+            }
+
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (currentMode === 'image') {
+                    previewTitle.textContent = 'Original Image';
+                    // Check if we already have an img element
+                    let imgEl = previewContent.querySelector('img');
+                    if (!imgEl) {
+                        previewContent.innerHTML = '<img alt="Original preview" style="max-width: 100%; max-height: 400px; border-radius: 8px;">';
+                    }
+                    previewContent.querySelector('img').src = e.target.result;
+                } else {
+                    const videoUrl = URL.createObjectURL(file);
+                    previewContent.innerHTML = `<video src="${videoUrl}" controls style="max-width: 100%; max-height: 300px;"></video>`;
+                    previewTitle.textContent = 'Original Video';
+                }
+                uploadArea.style.display = 'none';
+                previewSection.style.display = 'block';
+                analyzeButton.disabled = false;
+                resultsSection.style.display = 'none';
+                hideError();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // Clear button handler
+        clearButton.addEventListener('click', clearFile);
+
+        function clearFile() {
+            selectedFile = null;
+            fileInput.value = '';
+            uploadArea.style.display = 'block';
+            previewSection.style.display = 'none';
+            analyzeButton.disabled = true;
+            resultsSection.style.display = 'none';
+            hideError();
+        }
+
+        // Analyze button handler
+        analyzeButton.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            if (currentMode === 'image') {
+                formData.append('image', selectedFile);
+                loading.querySelector('p').textContent = 'Analyzing image...';
+            } else {
+                formData.append('video', selectedFile);
+                loading.querySelector('p').textContent = 'Analyzing video...';
+            }
+
+            loading.style.display = 'block';
+            resultsSection.style.display = 'none';
+            hideError();
+
+            try {
+                const endpoint = currentMode === 'image' ? '/api/count' : '/api/process-video';
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    if (currentMode === 'image') {
+                        countValue.textContent = data.count;
+                        resultImage.src = 'data:image/jpeg;base64,' + data.image;
+                    } else {
+                        countValue.textContent = data.stats.average;
+                        maxCountEl.textContent = data.stats.max;
+                        minCountEl.textContent = data.stats.min;
+                        frameCountEl.textContent = data.stats.total_frames;
+                        resultVideo.src = 'data:video/avi;base64,' + data.video;
+                    }
+                    resultsSection.style.display = 'block';
+                    loading.style.display = 'none';
+
+                    // Scroll to results
+                    resultsSection.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    showError(data.error || 'Analysis failed');
+                    loading.style.display = 'none';
+                }
+            } catch (error) {
+                showError('Failed to connect to server');
+                loading.style.display = 'none';
+            }
+        });
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

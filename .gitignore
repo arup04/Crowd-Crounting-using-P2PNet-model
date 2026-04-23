@@ -1,0 +1,66 @@
+# Virtual environment
+.venv/
+env/
+ENV/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Datasets (large files)
+railway_dataset2/
+
+# Model weights
+*.pth
+*.pt
+*.onnx
+*.h5
+*.pth.tar
+
+# Video files
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+
+# Demo results and outputs
+demo_results/
+temp_*.mp4
+temp_*.avi
+static/uploads/
+static/temp/
+
+# Logs
+*.log
+logs/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment files
+.env
+.env.local
+
+
+#runs
+runs/
